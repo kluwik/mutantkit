@@ -17,7 +17,7 @@ flags.mark_flag_as_required("mutation")
 flags.mark_flag_as_required("pdb_file")
 flags.mark_flag_as_required("chain")
 
-eris='/home/m.pak/bin/eris_standalone-Linux-1.0/bin/eris'
+eris='~/bin/eris_standalone-Linux-1.0/bin/eris'
 
 def runEris(mutation, pdb_file, chain, output_tag, output_dir): 
     
