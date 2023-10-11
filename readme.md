@@ -5,7 +5,7 @@
 ```
 git clone https://github.com/kluwik/mutantkit.git
 cd mutantkit
-python setup.py develop
+python setup.py develop # develop mode чтобы вносить правки в сурс без переустановки
 ```
 
 ## Usage
