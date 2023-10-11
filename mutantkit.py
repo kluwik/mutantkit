@@ -1,8 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
 
 import pandas as pd
 import numpy as np
@@ -30,7 +26,6 @@ def splitMutation(dataframe, mutation_column):
     df['position'] = df[mutation_column].apply(lambda x: x[1:-1]).astype('int64')
     df['mut_aa'] = df[mutation_column].apply(lambda x: x[-1])
     return df
-
 
 def getDDG(data, y_ddg, outliers=False, outliers_threshold=None):
     
@@ -79,10 +74,6 @@ def getAntisymmetry(f, r):
     pcc =  getStat(f, r)[0]
     b = np.sum((f + r)) / (2*len(f))
     return round(pcc,2), round(b,2)
-
-
-# In[5]:
-
 
 def getMutationProps(mutation):
     # does not distinguish between C(SH) and C(SS)
@@ -136,12 +127,6 @@ def getMutationProps(mutation):
     
     return (chargeF,chargeChange), (hydroF,hydroChange), (polarF,polarChange), (sizeF,sizeChange)
 
-#getMutationProps('D1K')
-
-
-# In[6]:
-
-
 def getSeq(pdb, chain):
     '''
     Returns a tuple of SEQRES sequence and ATOM sequence.
@@ -157,12 +142,6 @@ def getSeq(pdb, chain):
                 if i.annotations['chain'] == chain:
                     atom = str(i.seq)
     return seqres, atom
-
-#getSeq('2AMI', 'A')
-
-
-# In[93]:
-
 
 def getResidueIndex(pdb, chain, mutation):
     '''
@@ -185,13 +164,6 @@ def getResidueIndex(pdb, chain, mutation):
                 return i, match
     except:
         return None
-    
-#getResidueIndex('2AMI', 'A', 'A35N')
-#getResidueIndex('2AMI', 'A', 'Z35N')
-
-
-# In[90]:
-
 
 def mutations2020(mutations):
     
@@ -207,12 +179,6 @@ def mutations2020(mutations):
     aa2020 = {k:v[k] if k in mutations.keys() else 0 for k in aa_pairs}
     aa2020 = np.array(list(aa2020.values())).reshape((20,20))
     return aa2020
-
-#mutations2020(['A2N', 'E43D', 'W209Y', 'A24N', 'E12A'])
-
-
-# In[94]:
-
 
 def checkPosition(mutation, chain, pdb='', path=''):
     
@@ -249,9 +215,6 @@ def checkPosition(mutation, chain, pdb='', path=''):
         else:
             print('No such file', path)
             
-#checkResidueNumber('D48Q', 'A', path='/home/i.vorobiev/ivan/AF_models/1RN1_A/ranked_0.pdb')            
-
-
 def getRenumberedPositions(mutations, seq=None):
     
     '''
@@ -287,4 +250,3 @@ def getRenumberedPositions(mutations, seq=None):
 
 #getRenumberedPositions(['Q30A', 'G45A', 'L59A', 'E86A', 'G23A', 'E26A'], \
 #           'RVGLTEEQKQEIREAFDLFDTDGSGTIDAKELKVAMRALGFEPKKEEIKKMISEIDKDGSGTIDFEEFLTMMTAKM')
-
