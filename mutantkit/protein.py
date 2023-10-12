@@ -2,10 +2,10 @@
 
 import pandas as pd
 import numpy as np
-import os, warnings, re
+import os, warnings, re, subprocess
 
 from Bio.PDB import PDBParser
-from Bio.PDB.Polypeptide import three_to_one, one_to_three
+from Bio.PDB.Polypeptide import three_to_one, one_to_three, is_aa
 p = PDBParser(QUIET=True)
 from Bio import SeqIO
 from Bio import Entrez
@@ -14,7 +14,7 @@ import urllib.request
 from urllib.error import HTTPError
 import ast
 
-from mutantkit.config import pdb_file_path, cif_file_path
+from mutantkit.config import pdb_file_path, cif_file_path, downloadPdb
 
 def parseUrl(url):
     try:
@@ -26,7 +26,7 @@ def parseUrl(url):
 
 ################################# PDB STRUCTURE #################################
 
-def getSeq(pdb, chain, file_format='pdb', download=True):
+def getSeq(pdb, chain, file_format='pdb'):
     '''
     Returns a tuple of SEQRES sequence and ATOM sequence.
     '''
@@ -45,21 +45,24 @@ def getSeq(pdb, chain, file_format='pdb', download=True):
         file = pdb_file_path(pdb)
     elif file_format == 'cif':
         file = cif_file_path(pdb)
-        
-    if os.path.isfile(file) and os.stat(file).st_size != 0:
-        seqres = seqParser(file, file_format, 'seqres', chain)
-        atom = seqParser(file, file_format, 'atom', chain)
-        return seqres, atom
-    else:
-        if download == True:
-            os.system(f'wget https://files.rcsb.org/download/{pdb}.{file_format} -O {file}')
-            seqres = seqParser(file, file_format, 'seqres', chain)
-            atom = seqParser(file, file_format, 'atom', chain)
-            return seqres, atom
-        else:
-            print(f'No file {file}. Run with download=True.')
-            return None, None
+    
+    # downloads file if absent or empty
+    downloadPdb(pdb, file)
+    seqres = seqParser(file, file_format, 'seqres', chain)
+    atom = seqParser(file, file_format, 'atom', chain)
+    return seqres, atom
 
+def getSeqres(pdb, chain, pdb_seqres_file = '/home/m.pak/db/pdb_seqres.txt'):
+    '''
+    Extract seqres from pdb_seqres.txt file (https://ftp.wwpdb.org/pub/pdb/derived_data/pdb_seqres.txt.gz)
+    Медленная. 
+    '''
+    pdbid = f'{pdb}_{chain}'
+    line = subprocess.check_output(f'grep -n {pdbid} {pdb_seqres_file}', shell=True).decode('utf-8')
+    line = int(line.split(':')[0]) + 1
+    seqres = subprocess.check_output(f"sed -n '{line}p' {pdb_seqres_file}", shell=True).decode('utf-8')
+    seqres = seqres.strip()
+    return seqres
 
 def parsePDBFasta(pdb, chain=None):
     fasta = parseUrl('https://www.rcsb.org/fasta/entry/'+pdb+'/display')
@@ -117,7 +120,55 @@ def getResolution(pdb, download_cif = False):
         if download_cif == True:
             os.system(f'wget https://files.rcsb.org/download/{pdb.lower()}.cif -O {cif_file}')
             return parseResFromCif(cif_file)    
+
+        
+def getAminoacidLigands(pdb, chain=None):
+    '''
+    Returns a list of tuples with amino acid ligands (ligand name, residue number, chain)
+    !!! Biopython 1.81 is required! is_aa() doesn't work properly for older versions.
+    '''
+    def extract_section(cif_data, section_name):
+        hits = [i for i in cif_data if section_name in i] # ideally returns a list with a single item that is a query section
+        # but sometimes section name can be mentioned in other comment-like sections, e.g. "audit"
+        # thus, several sections are returned: a query and those, where query is mentioned
+        if len(hits) > 1: 
+            for i in hits: 
+                # each line in the query section starts with its name, that's how it can be distinguished from others
+                # but firstly, we need to remove 'loop_\n' in the beginning of the section
+                # it is present if section is organised as a table
+                item = i.replace('loop_\n', '')
+                # now we check that the first line of the section starts with its name
+                if item.split('\n')[0].startswith(section_name):
+                    return i
+        elif hits != []:
+            return hits[0]
+        else:
+            return hits
+
+    def parse_section(section, section_name):
+        if 'loop_' in section:
+            section = section.replace('loop_\n', '').strip().split('\n')
+            data = [i for i in section if i.startswith(section_name) == False]
+            return [(i.split()[2], i.split()[4], i.split()[-2]) for i in data] # name residue_number auth_chain
+        else:
+            return section.split('\n')[2].split()[1], section.split('\n')[4].split()[1], section.split('\n')[-2].split()[1]
     
+    cif_file = cif_file_path(pdb)
+    downloadPdb(pdb, cif_file)
+    with open(cif_file) as f:
+        cif_data = f.read()
+    cif_data = cif_data.split('# \n')
+    
+    hetnam = extract_section(cif_data, '_pdbx_nonpoly_scheme') # аналогично можно modres = extract_section(cif_data, '_pdbx_struct_mod_residue')
+    if hetnam != []:
+        het_residues = parse_section(hetnam, '_pdbx_nonpoly_scheme')
+        het_residues = [i for i in het_residues if is_aa(i[0], standard=False)]
+        het_residues = list(set(het_residues))
+        if chain:
+            het_residues = [i for i in het_residues if i[-1] == chain]
+        if het_residues != []:
+            return het_residues
+        
 ################################# CROSS-REFERENCES #################################
 
 def getUniprotTxt(uni):
@@ -216,3 +267,9 @@ def getUniprotForPdb(pdb, chain=None):
         else:
             uni = [result['primaryAccession'] for result in results]
         return uni
+    
+    
+#### notes #####
+'''
+по такой ссылке последовательность выводится с нестандартными остатками в скобках https://www.rcsb.org/fasta/chain/1brz.A/display
+'''
