@@ -46,7 +46,7 @@ def getSeq(pdb, chain, file_format='pdb', download=True):
     elif file_format == 'cif':
         file = cif_file_path(pdb)
         
-    if os.path.isfile(file):
+    if os.path.isfile(file) and os.stat(file).st_size != 0:
         seqres = seqParser(file, file_format, 'seqres', chain)
         atom = seqParser(file, file_format, 'atom', chain)
         return seqres, atom
